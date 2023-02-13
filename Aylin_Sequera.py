@@ -5,10 +5,17 @@ import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+def extraer_data(archivo):
+    return pd.read_json(archivo,encoding='utf-8', orient= 'record')
+
 #Leer los archivos Json
-clientes =  pd.read_json('Clientes.json',encoding='utf-8', orient= 'record')
-gestiones =  pd.read_json('Gestiones.json',orient= 'record')
-ventas =  pd.read_json('Ventas.json',orient= 'record')
+#clientes =  pd.read_json('Clientes.json',encoding='utf-8', orient= 'record')
+#gestiones =  pd.read_json('Gestiones.json',orient= 'record')
+#ventas =  pd.read_json('Ventas.json',orient= 'record')
+
+clientes = extraer_data('Clientes.json')
+gestiones = extraer_data('Gestiones.json')
+ventas = extraer_data('Ventas.json')
 
 #Funciones
 def validate(df, column_name):
@@ -36,6 +43,12 @@ def validate_telefono(df):
 
 
 #Clientes.json
+#Normalizacion de 'Nombre'
+clientes['Nombre']= clientes['Nombre'].str.title()
+
+#Normalizacion de 'Direccion'
+clientes['Direccion'] = clientes['Direccion'].apply(lambda x: x.lower() if type(x) == str else x)
+
 #Normalizacion de la columna 'Tipo de documento' a los tipos permitidos
 clientes = clientes.replace({'Tipo de documento':{
                         'c.e':'Cedula De Extranjeria',
@@ -51,23 +64,19 @@ clientes = clientes.replace({'Tipo de documento':{
                         'Pass': 'Pasaporte'}})
 
 #Normalizacion de 'Documento'
-'''Debido a valores repetidos en 'Documento', se creo una clave subrogada 'Documentos'
+'''Debido a valores repetidos en 'Documento', se creo una clave subrogada 'id_Cliente'
 tomando las inicales del 'tipo de documento', y como continuan habiando
 duplicados se elimino el ultimo registro,ademas se creo la tabla
 'duplicados' con dichos valores para su consideracion.'''
 clientes['TD'] = clientes['Tipo de documento'].apply(lambda x: "".join([palabra[0] for palabra in x.split()]).replace('D',''))
-clientes.insert(0, 'Documentos', clientes['TD'].apply(str) + clientes['Documento'].apply(str))
+clientes.insert(0, 'id_Cliente', clientes['TD'].apply(str) + clientes['Documento'].apply(str))
 
 duplicados = clientes[clientes.duplicated(['Documento'], keep=False)].sort_values(by='Documento')
 clientes = clientes.drop_duplicates(clientes.columns[clientes.columns.isin(['Documento'])],keep='first')
 
-validate(clientes,'Documentos')
+validate(clientes,'id_Cliente')
 
-#Normalizacion de 'Nombre'
-clientes['Nombre']= clientes['Nombre'].str.title()
 
-#Normalizacion de 'Direccion'
-clientes['Direccion'] = clientes['Direccion'].apply(lambda x: x.lower() if type(x) == str else x)
 
 #Normalizacion de 'Telefono'
 '''Se crea un nueva tabla "phone_invalid" para guardar los registros de
@@ -90,7 +99,7 @@ ventas['Valor'] = ventas['Valor'].apply(lambda x: x.replace('$','').replace('.',
 #Clave Subrogada Clientes
 cliente = clientes[['Documento','TD']]
 ventas = pd.merge(left=ventas,right=cliente, how='left',left_on='Cliente', right_on='Documento', left_index=False, right_index=False)
-ventas['Cliente'] = ventas['TD'].apply(str) + ventas['Documento'].apply(str)
+ventas['id_Cliente'] = ventas['TD'].apply(str) + ventas['Documento'].apply(str)
 ventas.drop(['Documento','TD'],axis=1, inplace=True)
 
 #Validacion y normalizacion de datos Gestiones.json
@@ -103,7 +112,7 @@ gestiones['Fecha'] = pd.to_datetime(gestiones['Fecha']).dt.strftime('%Y-%m-%d')
 
 #Clave Subrogada Clientes
 gestiones = pd.merge(left=gestiones,right=cliente, how='left',left_on='Cliente', right_on='Documento', left_index=False, right_index=False)
-gestiones['Cliente'] = gestiones['TD'].apply(str) + gestiones['Documento'].apply(str)
+gestiones['id_Cliente'] = gestiones['TD'].apply(str) + gestiones['Documento'].apply(str)
 gestiones.drop(['Documento','TD'],axis=1, inplace=True)
 
 
@@ -119,9 +128,9 @@ conexion = pymysql.connect(
 cursor = conexion.cursor()
 
 #creación de nueva base de datos
-cursor.execute("CREATE DATABASE IF NOT EXISTS prueba;")
+cursor.execute("CREATE DATABASE IF NOT EXISTS prueba_AS;")
 
-select_bd = "USE prueba;"
+select_bd = "USE prueba_AS;"
 cursor.execute(select_bd)
 
 #Crear tablas
