@@ -246,5 +246,5 @@ def ETL():
   cursor.close()
   conexion.close()
 
-  if __name__ == '__main__':
-    ETL()
+if __name__ == '__main__':
+  ETL()
